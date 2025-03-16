@@ -2,154 +2,171 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudioChat - DeepSeek LLM Interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voice Chat</title>
     <style>
-        /* Basic Highlighting CSS (Simplified) */
-        .hljs {
-            background: #f0f0f0;
-            color: #444;
-            padding: 0.5em;
-        }
-        .hljs-keyword, .hljs-selector-tag {
-            font-weight: bold;
-            color: #008;
-        }
-
+        /* Ultra-minimal dark theme */
         body {
-            background-color: #222;
-            color: #888;
-            font-family: monospace;
+            background: #222;
+            color: #eee;
+            font-family: system-ui, sans-serif;
             margin: 0;
-            padding: 0;
-            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-
-        #chat-container {
-            width: 90%;
-            max-width: 800px;
-            margin: 20px auto;
+        
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        #header {
             padding: 10px;
-            border: 1px solid #444;
-            overflow-y: auto;
-            height: calc(80vh - 40px);
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            background: #111;
         }
-
+        
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
         .message {
             padding: 8px;
-            margin-bottom: 5px;
-            border-radius: 4px;
-            word-wrap: break-word;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            max-width: 85%;
         }
-
+        
         .user-message {
-            background-color: #333;
-            color: #aaa;
-            text-align: right;
+            background: #2c3e50;
+            margin-left: auto;
         }
-
+        
         .bot-message {
-            background-color: #444;
-            color: #bbb;
-            text-align: left;
+            background: #34495e;
+            margin-right: auto;
         }
-
+        
         #controls {
-            width: 90%;
-            max-width: 800px;
-            margin: 0 auto;
             padding: 10px;
-            text-align: center;
+            display: flex;
+            background: #111;
         }
-
-        button, input[type="text"] {
-            padding: 8px 12px;
-            margin: 5px;
-            border: 1px solid #555;
-            background-color: #333;
-            color: #999;
-            border-radius: 4px;
-            font-family: monospace;
-            outline: none;
+        
+        #text-input {
+            flex: 1;
+            padding: 8px;
+            border-radius: 16px;
+            border: none;
+            background: #333;
+            color: #fff;
+            margin-right: 8px;
         }
-
-        button:hover {
-            background-color: #555;
-            color: #ddd;
+        
+        button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: #3498db;
+            color: white;
+            font-weight: bold;
         }
-
-        button.listening {
-            background-color: #800;
-            color: #eee;
+        
+        #talk-button {
+            margin-right: 8px;
         }
-
-        input[type="text"] {
-            width: 60%;
+        
+        #talk-button.listening {
+            background: #e74c3c;
         }
-
+        
         #api-key-container {
-            width: 90%;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 10px;
-            text-align: center;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
         }
-
+        
         #api-key {
-            width: 60%;
-            padding: 8px 12px;
-            margin: 5px;
-            border: 1px solid #555;
-            background-color: #333;
-            color: #999;
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
             border-radius: 4px;
-            font-family: monospace;
-            outline: none;
+            border: none;
+            background: #333;
+            color: #fff;
         }
-
+        
         #save-api-key {
-            padding: 8px 12px;
-            margin: 5px;
-            border: 1px solid #555;
-            background-color: #333;
-            color: #999;
+            width: 100%;
             border-radius: 4px;
-            font-family: monospace;
-            outline: none;
+            height: auto;
+        }
+        
+        .status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #555;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        
+        .status.active {
+            background: #2ecc71;
         }
     </style>
 </head>
 <body>
     <div id="api-key-container">
-        <input type="password" id="api-key" placeholder="Enter your DeepSeek API key">
-        <button id="save-api-key">Save API Key</button>
+        <h2>Enter API Key</h2>
+        <input type="password" id="api-key" placeholder="DeepSeek API key">
+        <button id="save-api-key">Save</button>
     </div>
-    <div id="chat-container"></div>
-    <div id="controls">
-        <button id="talk-button" class="ready">Start Live Chat</button>
-        <input type="text" id="text-input" placeholder="Or type your message...">
-        <button id="send-button">Send</button>
+
+    <div id="app-container">
+        <div id="header">
+            <h2>Voice Chat</h2>
+            <div class="status" id="status-indicator"></div>
+        </div>
+        <div id="chat-container"></div>
+        <div id="controls">
+            <button id="talk-button">🎤</button>
+            <input type="text" id="text-input" placeholder="Type message...">
+            <button id="send-button">➤</button>
+        </div>
     </div>
 
     <script>
+        // Global variables
         let recognition;
         let isChatting = false;
         let messageHistory = [];
         let currentTTS = null;
         let botDiv;
         let apiKey = '';
-        let preferredVoices = [
-            'AvaMultilingual', 'Microsoft Ava', 'Ava', 'Microsoft Ava (Natural)',
-            'Microsoft Ava (Multilingual)', 'Microsoft Aria Online (Natural)',
-            'Microsoft David', 'Microsoft Mark'
-        ];
+        let llmController;
+        let voices = [];
+        let isAndroid = /Android/i.test(navigator.userAgent);
+        let statusIndicator = document.getElementById('status-indicator');
 
         // Check if API key exists in localStorage
         if (localStorage.getItem('deepseekApiKey')) {
             apiKey = localStorage.getItem('deepseekApiKey');
             document.getElementById('api-key').value = apiKey;
             document.getElementById('api-key-container').style.display = 'none';
+            addWelcomeMessage();
         }
 
         // Save API key
@@ -158,31 +175,53 @@
             if (apiKey) {
                 localStorage.setItem('deepseekApiKey', apiKey);
                 document.getElementById('api-key-container').style.display = 'none';
-                addMessage('API key saved successfully!', false);
+                addWelcomeMessage();
             } else {
                 alert('Please enter a valid API key');
             }
         };
 
-        // Initialize speech recognition
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = 'en-US';
-            setupSpeechHandlers();
+        function addWelcomeMessage() {
+            addMessage("Hello! I'm your voice assistant. Tap the microphone button to start speaking, or type your message below.", false);
+        }
+
+        // Initialize speech recognition with Android optimizations
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                
+                // Android optimization: shorter recognition sessions
+                recognition.continuous = isAndroid ? false : true;
+                recognition.interimResults = true;
+                
+                // Use device language
+                recognition.lang = navigator.language || 'en-US';
+                
+                setupSpeechHandlers();
+                return true;
+            } else if ('SpeechRecognition' in window) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = isAndroid ? false : true;
+                recognition.interimResults = true;
+                recognition.lang = navigator.language || 'en-US';
+                setupSpeechHandlers();
+                return true;
+            }
+            return false;
         }
 
         function setupSpeechHandlers() {
             recognition.onstart = () => {
                 document.getElementById('talk-button').classList.add('listening');
-                document.getElementById('talk-button').textContent = 'Listening...';
+                statusIndicator.classList.add('active');
             };
 
             recognition.onend = () => {
                 document.getElementById('talk-button').classList.remove('listening');
-                document.getElementById('talk-button').textContent = 'Start Live Chat';
-                if (isChatting) {
+                statusIndicator.classList.remove('active');
+                
+                // On Android, we don't auto-restart recognition to avoid battery drain
+                if (isChatting && !isAndroid) {
                     recognition.start();
                 }
             };
@@ -195,23 +234,57 @@
                     if (transcript) {
                         addMessage(transcript, true);
                         await getLLMResponse(transcript);
+                        
+                        // For Android, we need to manually restart if in chat mode
+                        if (isChatting && isAndroid) {
+                            setTimeout(() => {
+                                try {
+                                    recognition.start();
+                                } catch (e) {
+                                    console.log("Error restarting recognition:", e);
+                                }
+                            }, 1000);
+                        }
                     }
                 }
             };
-             recognition.onerror = (event) => {
+
+            recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
-              };
+                statusIndicator.classList.remove('active');
+                document.getElementById('talk-button').classList.remove('listening');
+                
+                // Handle Android-specific errors
+                if (event.error === 'network' || event.error === 'service-not-allowed') {
+                    addMessage("Speech recognition error. Please check your internet connection.", false);
+                }
+                
+                // For Android, we need to manually restart if in chat mode
+                if (isChatting && isAndroid && event.error !== 'no-speech') {
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                        } catch (e) {
+                            console.log("Error restarting recognition after error:", e);
+                        }
+                    }, 2000);
+                }
+            };
         }
 
         function addMessage(text, isUser) {
             const div = document.createElement('div');
             div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            div.textContent = text;  //No more Markdown Interpretation
+            div.textContent = text;
             document.getElementById('chat-container').appendChild(div);
-            div.scrollIntoView({ behavior: 'smooth' });
+            
+            // Scroll to bottom with a slight delay to ensure rendering
+            setTimeout(() => {
+                div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 100);
+            
+            return div;
         }
-
-        let llmController;
 
         async function getLLMResponse(userInput) {
             if (!apiKey) {
@@ -221,13 +294,12 @@
             }
             
             try {
-                botDiv = document.createElement('div');
-                botDiv.className = `message bot-message`;
-                botDiv.textContent = 'Thinking...';
-                document.getElementById('chat-container').appendChild(botDiv);
-                botDiv.scrollIntoView({ behavior: 'smooth' });
+                botDiv = addMessage('Thinking...', false);
 
-                speakResponse("Thinking...");
+                // Only speak "thinking" on non-Android devices to avoid interruptions
+                if (!isAndroid) {
+                    speakResponse("Thinking...");
+                }
 
                 llmController = new AbortController();
                 const signal = llmController.signal;
@@ -278,21 +350,37 @@
                 window.speechSynthesis.cancel();
 
                 const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Android optimization: shorter chunks for better performance
+                if (isAndroid && text.length > 100) {
+                    const chunks = splitTextIntoChunks(text);
+                    speakChunks(chunks, 0);
+                    return;
+                }
 
-                let selectedVoice = null;
-                for (const voiceName of preferredVoices) {
-                    selectedVoice = voices.find(v => v.name.includes(voiceName));
+                // Try to find a good voice
+                if (voices.length > 0) {
+                    // Prefer a voice in the user's language
+                    const userLang = navigator.language || 'en-US';
+                    const langCode = userLang.split('-')[0];
+                    
+                    // First try to find a voice that matches the full locale
+                    let selectedVoice = voices.find(v => v.lang === userLang);
+                    
+                    // If not found, try to find a voice that matches just the language code
+                    if (!selectedVoice) {
+                        selectedVoice = voices.find(v => v.lang.startsWith(langCode));
+                    }
+                    
+                    // If still not found, use any available voice
                     if (selectedVoice) {
-                        break;
+                        utterance.voice = selectedVoice;
                     }
                 }
 
-                if (selectedVoice) {
-                    utterance.voice = selectedVoice;
-                } else {
-                    console.log("Preferred voice not found. Using default voice.");
-                }
-
+                utterance.rate = isAndroid ? 0.9 : 1.0; // Slightly slower on Android for better clarity
+                utterance.pitch = 1.0;
+                
                 utterance.onend = () => {
                     currentTTS = null;
                 };
@@ -301,6 +389,58 @@
                 window.speechSynthesis.speak(utterance);
             }
         }
+        
+        // Split long text into smaller chunks for better Android TTS performance
+        function splitTextIntoChunks(text, maxLength = 100) {
+            const chunks = [];
+            const sentences = text.split(/(?<=[.!?])\s+/);
+            
+            let currentChunk = "";
+            
+            for (const sentence of sentences) {
+                if (currentChunk.length + sentence.length > maxLength) {
+                    if (currentChunk) {
+                        chunks.push(currentChunk);
+                    }
+                    currentChunk = sentence;
+                } else {
+                    currentChunk += (currentChunk ? " " : "") + sentence;
+                }
+            }
+            
+            if (currentChunk) {
+                chunks.push(currentChunk);
+            }
+            
+            return chunks;
+        }
+        
+        // Speak text chunks sequentially
+        function speakChunks(chunks, index) {
+            if (index >= chunks.length) return;
+            
+            const utterance = new SpeechSynthesisUtterance(chunks[index]);
+            
+            if (voices.length > 0) {
+                const userLang = navigator.language || 'en-US';
+                const langCode = userLang.split('-')[0];
+                
+                let selectedVoice = voices.find(v => v.lang === userLang) || 
+                                   voices.find(v => v.lang.startsWith(langCode)) ||
+                                   voices[0];
+                
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                }
+            }
+            
+            utterance.rate = isAndroid ? 0.9 : 1.0;
+            utterance.onend = () => {
+                speakChunks(chunks, index + 1);
+            };
+            
+            window.speechSynthesis.speak(utterance);
+        }
 
         function interruptTTSAndLLM() {
             if (llmController) {
@@ -308,7 +448,7 @@
                 llmController = null;
             }
 
-            if (window.speechSynthesis && currentTTS) {
+            if (window.speechSynthesis) {
                 window.speechSynthesis.cancel();
                 currentTTS = null;
             }
@@ -317,13 +457,22 @@
         document.getElementById('talk-button').onclick = () => {
             interruptTTSAndLLM();
 
-            if (!recognition) {
-                alert('Speech recognition not supported in this browser');
+            if (!recognition && !initSpeechRecognition()) {
+                addMessage('Speech recognition is not supported in this browser', false);
                 return;
             }
+            
             isChatting = !isChatting;
+            
             if (isChatting) {
-                recognition.start();
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error("Error starting recognition:", e);
+                    // If already started, stop and restart
+                    recognition.stop();
+                    setTimeout(() => recognition.start(), 200);
+                }
             } else {
                 recognition.stop();
             }
@@ -341,17 +490,43 @@
         };
 
         document.getElementById('text-input').onkeypress = (e) => {
-            interruptTTSAndLLM();
             if (e.key === 'Enter') {
                 document.getElementById('send-button').click();
+                e.preventDefault();
             }
         };
 
-        // Get the voices asynchronously
-        window.speechSynthesis.onvoiceschanged = () => {
+        // Get the voices
+        function loadVoices() {
             voices = window.speechSynthesis.getVoices();
-        };
-        let voices = window.speechSynthesis.getVoices();
+        }
+        
+        if (window.speechSynthesis) {
+            loadVoices();
+            // Chrome needs this event for voices to load
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        
+        // Prevent zoom on double tap for iOS
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            const DOUBLE_TAP_THRESHOLD = 300;
+            if (now - lastTouchEnd <= DOUBLE_TAP_THRESHOLD) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+        
+        // Prevent pull-to-refresh on mobile
+        document.body.addEventListener('touchmove', function(e) {
+            if (e.target.id !== 'chat-container') {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Initialize speech recognition
+        initSpeechRecognition();
     </script>
 </body>
 </html>
