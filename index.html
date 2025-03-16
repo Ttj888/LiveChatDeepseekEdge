@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudioChat - DeepSeek LLM Interface</title>
+    <style>
+        /* Basic Highlighting CSS (Simplified) */
+        .hljs {
+            background: #f0f0f0;
+            color: #444;
+            padding: 0.5em;
+        }
+        .hljs-keyword, .hljs-selector-tag {
+            font-weight: bold;
+            color: #008;
+        }
+
+        body {
+            background-color: #222;
+            color: #888;
+            font-family: monospace;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #chat-container {
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            border: 1px solid #444;
+            overflow-y: auto;
+            height: calc(80vh - 40px);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .message {
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #333;
+            color: #aaa;
+            text-align: right;
+        }
+
+        .bot-message {
+            background-color: #444;
+            color: #bbb;
+            text-align: left;
+        }
+
+        #controls {
+            width: 90%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 10px;
+            text-align: center;
+        }
+
+        button, input[type="text"] {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #999;
+            border-radius: 4px;
+            font-family: monospace;
+            outline: none;
+        }
+
+        button:hover {
+            background-color: #555;
+            color: #ddd;
+        }
+
+        button.listening {
+            background-color: #800;
+            color: #eee;
+        }
+
+        input[type="text"] {
+            width: 60%;
+        }
+
+        #api-key-container {
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 10px;
+            text-align: center;
+        }
+
+        #api-key {
+            width: 60%;
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #999;
+            border-radius: 4px;
+            font-family: monospace;
+            outline: none;
+        }
+
+        #save-api-key {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #999;
+            border-radius: 4px;
+            font-family: monospace;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="api-key-container">
+        <input type="password" id="api-key" placeholder="Enter your DeepSeek API key">
+        <button id="save-api-key">Save API Key</button>
+    </div>
+    <div id="chat-container"></div>
+    <div id="controls">
+        <button id="talk-button" class="ready">Start Live Chat</button>
+        <input type="text" id="text-input" placeholder="Or type your message...">
+        <button id="send-button">Send</button>
+    </div>
+
+    <script>
+        let recognition;
+        let isChatting = false;
+        let messageHistory = [];
+        let currentTTS = null;
+        let botDiv;
+        let apiKey = '';
+        let preferredVoices = [
+            'AvaMultilingual', 'Microsoft Ava', 'Ava', 'Microsoft Ava (Natural)',
+            'Microsoft Ava (Multilingual)', 'Microsoft Aria Online (Natural)',
+            'Microsoft David', 'Microsoft Mark'
+        ];
+
+        // Check if API key exists in localStorage
+        if (localStorage.getItem('deepseekApiKey')) {
+            apiKey = localStorage.getItem('deepseekApiKey');
+            document.getElementById('api-key').value = apiKey;
+            document.getElementById('api-key-container').style.display = 'none';
+        }
+
+        // Save API key
+        document.getElementById('save-api-key').onclick = () => {
+            apiKey = document.getElementById('api-key').value.trim();
+            if (apiKey) {
+                localStorage.setItem('deepseekApiKey', apiKey);
+                document.getElementById('api-key-container').style.display = 'none';
+                addMessage('API key saved successfully!', false);
+            } else {
+                alert('Please enter a valid API key');
+            }
+        };
+
+        // Initialize speech recognition
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            setupSpeechHandlers();
+        }
+
+        function setupSpeechHandlers() {
+            recognition.onstart = () => {
+                document.getElementById('talk-button').classList.add('listening');
+                document.getElementById('talk-button').textContent = 'Listening...';
+            };
+
+            recognition.onend = () => {
+                document.getElementById('talk-button').classList.remove('listening');
+                document.getElementById('talk-button').textContent = 'Start Live Chat';
+                if (isChatting) {
+                    recognition.start();
+                }
+            };
+
+            recognition.onresult = async (event) => {
+                interruptTTSAndLLM();
+                const result = event.results[event.results.length - 1];
+                if (result.isFinal) {
+                    const transcript = result[0].transcript.trim();
+                    if (transcript) {
+                        addMessage(transcript, true);
+                        await getLLMResponse(transcript);
+                    }
+                }
+            };
+             recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+              };
+        }
+
+        function addMessage(text, isUser) {
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            div.textContent = text;  //No more Markdown Interpretation
+            document.getElementById('chat-container').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        let llmController;
+
+        async function getLLMResponse(userInput) {
+            if (!apiKey) {
+                addMessage('Please enter your DeepSeek API key first', false);
+                document.getElementById('api-key-container').style.display = 'block';
+                return;
+            }
+            
+            try {
+                botDiv = document.createElement('div');
+                botDiv.className = `message bot-message`;
+                botDiv.textContent = 'Thinking...';
+                document.getElementById('chat-container').appendChild(botDiv);
+                botDiv.scrollIntoView({ behavior: 'smooth' });
+
+                speakResponse("Thinking...");
+
+                llmController = new AbortController();
+                const signal = llmController.signal;
+
+                const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'deepseek-chat',
+                        messages: [...messageHistory, { role: 'user', content: userInput }],
+                        stream: false
+                    }),
+                    signal: signal
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API error: ${errorData.error?.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                const reply = data.choices[0].message.content;
+
+                botDiv.textContent = reply;
+
+                messageHistory.push({ role: 'user', content: userInput });
+                messageHistory.push({ role: 'assistant', content: reply });
+
+                speakResponse(reply);
+
+                llmController = null;
+
+            } catch (error) {
+                console.error('Error:', error);
+                if (error.name === 'AbortError') {
+                    botDiv.textContent = 'Request cancelled';
+                } else {
+                    botDiv.textContent = `Error: ${error.message}`;
+                }
+            }
+        }
+
+        function speakResponse(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+
+                let selectedVoice = null;
+                for (const voiceName of preferredVoices) {
+                    selectedVoice = voices.find(v => v.name.includes(voiceName));
+                    if (selectedVoice) {
+                        break;
+                    }
+                }
+
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                } else {
+                    console.log("Preferred voice not found. Using default voice.");
+                }
+
+                utterance.onend = () => {
+                    currentTTS = null;
+                };
+
+                currentTTS = utterance;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function interruptTTSAndLLM() {
+            if (llmController) {
+                llmController.abort();
+                llmController = null;
+            }
+
+            if (window.speechSynthesis && currentTTS) {
+                window.speechSynthesis.cancel();
+                currentTTS = null;
+            }
+        }
+
+        document.getElementById('talk-button').onclick = () => {
+            interruptTTSAndLLM();
+
+            if (!recognition) {
+                alert('Speech recognition not supported in this browser');
+                return;
+            }
+            isChatting = !isChatting;
+            if (isChatting) {
+                recognition.start();
+            } else {
+                recognition.stop();
+            }
+        };
+
+        document.getElementById('send-button').onclick = () => {
+            interruptTTSAndLLM();
+            const input = document.getElementById('text-input');
+            const text = input.value.trim();
+            if (text) {
+                addMessage(text, true);
+                getLLMResponse(text);
+                input.value = '';
+            }
+        };
+
+        document.getElementById('text-input').onkeypress = (e) => {
+            interruptTTSAndLLM();
+            if (e.key === 'Enter') {
+                document.getElementById('send-button').click();
+            }
+        };
+
+        // Get the voices asynchronously
+        window.speechSynthesis.onvoiceschanged = () => {
+            voices = window.speechSynthesis.getVoices();
+        };
+        let voices = window.speechSynthesis.getVoices();
+    </script>
+</body>
+</html>
